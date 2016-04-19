@@ -1,10 +1,8 @@
 from pso import pso
 import math
 
-def banana(x):
-    x1 = x[0]
-    x2 = x[1]
-    return x1**4 - 2*x2*x1**2 + x2**2 + x1**2 - 2*x1 + 5
+def rosen(x):
+    return sum(100.0*(x[1:]-x[:-1]**2.0)**2.0 + (1-x[:-1])**2.0)
     
 def ack(chromosome):
     firstSum = 0.0
@@ -21,8 +19,8 @@ def con(x):
     x2 = x[1]
     return [-(x1 + 0.25)**2 + 0.75*x2]
 
-lb = [-3, -1]
-ub = [2, 6]
+lb = [-32, -32, -32, -32, -32, -32]
+ub = [32, 32, 32, 32, 32, 32]
 
-xopt, fopt, p, fp = pso(ack, lb, ub, particle_output=True)
+xopt, fopt, p, fp = pso(rosen, lb, ub, particle_output=True)
 print xopt, fopt, p, fp
