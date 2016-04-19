@@ -1,4 +1,5 @@
 from pso import pso
+from parafreePSO import pso as pfpso
 import math
 
 def rosen(x):
@@ -22,5 +23,19 @@ def con(x):
 lb = [-32, -32, -32, -32, -32, -32]
 ub = [32, 32, 32, 32, 32, 32]
 
-xopt, fopt, p, fp = pso(rosen, lb, ub, particle_output=True)
+
+print("###################################################")
+print("Normal PSO")
+print("###################################################")
+xopt, fopt, p, fp = pso(ack, lb, ub, particle_output=True)
 print xopt, fopt, p, fp
+print("###################################################")
+print("Parameter Free PSO")
+print("###################################################")
+xoptpf, foptpf, p, fp = pfpso(ack, lb, ub, particle_output=True)
+print xoptpf, foptpf, p, fp
+print("###################################################")
+print("Normal PSO")
+print xopt, fopt
+print("PF PSO")
+print xoptpf, foptpf
