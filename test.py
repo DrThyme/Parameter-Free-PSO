@@ -2,10 +2,8 @@ from pso import pso
 from parafreePSO import pso as pfpso
 import math
 
-def banana(x):
-    x1 = x[0]
-    x2 = x[1]
-    return x1**4 - 2*x2*x1**2 + x2**2 + x1**2 - 2*x1 + 5
+def rosen(x):
+    return sum(100.0*(x[1:]-x[:-1]**2.0)**2.0 + (1-x[:-1])**2.0)
     
 def ack(chromosome):
     firstSum = 0.0
@@ -24,6 +22,7 @@ def con(x):
 
 lb = [-32, -32, -32, -32, -32, -32]
 ub = [32, 32, 32, 32, 32, 32]
+
 
 print("###################################################")
 print("Normal PSO")
