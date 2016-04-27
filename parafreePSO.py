@@ -139,9 +139,9 @@ def pso(func, lb, ub, ieqcons=[], f_ieqcons=None, args=(), kwargs={},
     phig_p = np.zeros_like(x) # Individual social component for each particle
 
     # Temporary initialiation of parameters for each particle
-    omega_uni = np.random.uniform(0.2,0.6,S)
-    phip_uni = np.random.uniform(0.2,0.6,S)
-    phig_uni = np.random.uniform(0.2,0.6,S)
+    omega_uni = np.random.uniform(0,1,S)
+    phip_uni = np.random.uniform(0,1,S)
+    phig_uni = np.random.uniform(0,1,S)
     for i in range(S):
         omega_p[i] = omega_uni[i]
         phip_p[i] = phip_uni[i]
