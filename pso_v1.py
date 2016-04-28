@@ -32,15 +32,15 @@ from deap import tools
 ##########################
 
 POP = 100
-GEN = 400
-PMIN = -6
-PMAX = 6
-K = 20
-DIM = 10
+GEN = 100
+PMIN = -32 
+PMAX = 32
+K = 5
+DIM = 50
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
-VISUALIZE = 0
+VISUALIZE = 1
 
 ##########################
 
@@ -48,6 +48,17 @@ creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
 creator.create("Particle", list, fitness=creator.FitnessMin, speed=list, 
     smin=None, smax=None, best=None, inertia=None, cognitive=None, social=None)
+    
+def withley(chromosome):
+    x = chromosome[:]
+    fitness = 0
+    limit = len(x)
+    for i in range(limit):
+        for j in range(limit):
+            temp = 100*((x[i]**2)-x[j]) + \
+                (1-x[j])**2
+            fitness += (float(temp**2)/4000.0) - math.cos(temp) + 1
+    return fitness
 
 
 def generate(size, pmin, pmax, smin, smax):
@@ -55,9 +66,9 @@ def generate(size, pmin, pmax, smin, smax):
     part.speed = [random.uniform(smin, smax) for _ in range(size)]
     part.smin = smin
     part.smax = smax
-    part.inertia = numpy.random.uniform(0,1)
-    part.cognitive = numpy.random.uniform(0,1)
-    part.social = numpy.random.uniform(0,1)
+    part.inertia = numpy.random.uniform(0,2)
+    part.cognitive = numpy.random.uniform(0,2)
+    part.social = numpy.random.uniform(0,2)
     return part
 
 def individual_generate(part):
@@ -109,18 +120,24 @@ def recalibrate_particles(pop,ga_pop):
         selected[i].inertia, selected[i].cognitive, selected[i].social = (ga_pop[i])[0],(ga_pop[i])[1], (ga_pop[i])[2]
     return pop
         
-def visualize_pso(pop,label,it):
+def visualize_pso(pop,label,it,heatmap):
+    plt.imshow(heatmap,extent=(PMIN,PMAX,PMIN,PMAX), origin ='lower')
+
+
     x = zip(*pop)[0]
     y = zip(*pop)[1]
-    plt.plot(x,y,'.')
+    plt.plot(x,y,'k.')
     plt.axis([PMIN,PMAX,PMIN,PMAX]) 
     name = 'frame' + label + str(0)*(3-len(it))+ str(it) + '.png'
     plt.savefig(name)
-    plt.clf()   
+    plt.clf()
+
+#    plt.show()
+
     
-def heatmap(fun)
-    mu = numpy.linspace(-10,10,100)
-    gamma = numpy.linspace(-10,10,100)
+def createheatmap(fun):
+    mu = numpy.linspace(PMIN,PMAX,100)
+    gamma = numpy.linspace(PMIN,PMAX,100)
 	
 	
     fun_map = numpy.empty((mu.size, gamma.size))
@@ -128,13 +145,7 @@ def heatmap(fun)
         for j in range(gamma.size):
             fun_map[i,j] = fun([mu[i], gamma[j]])[0]
     
-    fig = plt.figure()
-    s = fig.add_subplot(1, 1, 1)#, xlabel='$\\gamma$', ylabel='$\\mu$')
-    im = s.imshow(
-        fun_map,
-        extent=(gamma[0], gamma[-1], mu[0], mu[-1]),
-        origin='lower')
-    fig.show()
+    return fun_map
 		    
 
 toolbox = base.Toolbox()
@@ -153,7 +164,7 @@ toolbox.register("mate", tools.cxUniform, indpb=0.5)
 
 toolbox.register("selectBest", tools.selBest, k=K)
 toolbox.register("selectWorst", tools.selWorst, k=K)
-toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.1)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.1)
 
 
 def parameterfree_pso():
@@ -169,6 +180,8 @@ def parameterfree_pso():
 
     best = None
     
+    if VISUALIZE == 1:
+        heatmap = createheatmap(toolbox.evaluate)
 
 	
     for g in range(GEN):
@@ -189,14 +202,14 @@ def parameterfree_pso():
         print(logbook.stream) 
         ga_old = list(map(toolbox.clone, ga_pop))
         ga_pop = evolution(ga_pop)    
-        print "CONVERGE?"
-       	cv = all([all([(i == 0.2) for i in x]) for x in [map(operator.sub,ga_old[i], ga_pop[i]) for i in range(len(ga_pop))]])
-       	print cv
-       	if cv:
-       		print ga_pop[0]
+#        print "CONVERGE?"
+#       	cv = all([all([(i < 0.2) for i in x]) for x in [map(operator.sub,ga_old[i], ga_pop[i]) for i in range(len(ga_pop))]])
+#       	print cv
+#       	if cv:
+#       		print ga_pop[0]
         pop = recalibrate_particles(pop, ga_pop)
         if VISUALIZE == 1:
-            visualize_pso(pop,'_pf-',str(g))
+            visualize_pso(pop,'_pf-',str(g),heatmap)
 
     return pop, logbook, best
 
@@ -212,6 +225,9 @@ def normal_pso():
     logbook.header = ["gen", "evals"] + stats.fields
 
     best = None
+    
+    if VISUALIZE == 1:
+        heatmap = createheatmap(toolbox.evaluate)
 
     for g in range(GEN):
         for part in pop:
@@ -230,12 +246,12 @@ def normal_pso():
         print(logbook.stream)
 
         if VISUALIZE == 1:
-            visualize_pso(pop,'_normal-',str(g))
+            visualize_pso(pop,'_normal-',str(g),heatmap)
 
     return pop, logbook, best
 
 a,b,bestpf = parameterfree_pso()
 c,d,bestnorm = normal_pso()
 
-print "PF: Best value found: ", benchmarks.ackley(bestpf)[0]
-print "Normal: Best value found: ", benchmarks.ackley(bestnorm)[0]
+print "PF: Best value found: ", toolbox.evaluate(bestpf)
+print "Normal: Best value found: ", toolbox.evaluate(bestnorm)
