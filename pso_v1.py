@@ -19,12 +19,30 @@ import random
 import numpy
 import math
 
+import matplotlib.pyplot as plt
+
 from deap import base
 from deap import benchmarks
 from deap import creator
 from deap import tools
 
-import matplotlib.pyplot as plt
+
+##########################
+#Global variables go here#
+##########################
+
+POP = 100
+GEN = 400
+PMIN = -6
+PMAX = 6
+K = 20
+DIM = 10
+plt.figure()
+random.seed(1234)
+numpy.random.seed(1234)
+VISUALIZE = 0
+
+##########################
 
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
@@ -64,10 +82,10 @@ def updateParticle(part, best, phi1, phi2):
     part[:] = list(map(operator.add, part, part.speed))
 
 def evolution(ga_pop):
-    CXPB = 0.7
+    CXPB, MUTPB = 0.5, .2
     pop = ga_pop
     # Select the next generation individuals
-    offspring = toolbox.select(pop, len(pop))
+    offspring = toolbox.selectBest(pop)
     # Clone the selected individuals
     offspring = list(map(toolbox.clone, offspring))
     
@@ -77,32 +95,51 @@ def evolution(ga_pop):
         if random.random() < CXPB:
             toolbox.mate(child1, child2)
     pop[:] = offspring
+
+    for mutant in offspring:
+        if random.random() < MUTPB:
+            toolbox.mutate(mutant)
+
     return pop
 
+
 def recalibrate_particles(pop,ga_pop):
-    for i in range(0,len(pop)):
-        pop[i].inertia, pop[i].cognitive, pop[i].social = (ga_pop[i])[0],(ga_pop[i])[1], (ga_pop[i])[2]
+    selected = toolbox.selectWorst(pop)
+    for i in range(0,len(selected)):
+        selected[i].inertia, selected[i].cognitive, selected[i].social = (ga_pop[i])[0],(ga_pop[i])[1], (ga_pop[i])[2]
     return pop
         
+def visualize_pso(pop,label,it):
+    x = zip(*pop)[0]
+    y = zip(*pop)[1]
+    plt.plot(x,y,'.')
+    plt.axis([PMIN,PMAX,PMIN,PMAX]) 
+    name = 'frame' + label + str(0)*(3-len(it))+ str(it) + '.png'
+    plt.savefig(name)
+    plt.clf()   
     
 
 toolbox = base.Toolbox()
-toolbox.register("particle", generate, size=20, pmin=-32, pmax=32, smin=-10, smax=10)
+toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=-3, smax=3)
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
 toolbox.register("evaluate", benchmarks.ackley)
 
 # register the crossover operator
-toolbox.register("mate", tools.cxBlend, alpha=0.1)
+toolbox.register("mate", tools.cxUniform, indpb=0.5)
 # operator for selecting individuals for breeding the next
 # generation: each individual of the current generation
 # is replaced by the 'fittest' (best) of three individuals
 # drawn randomly from the current generation.
-toolbox.register("select", tools.selTournament, tournsize=10)
 
-def main():
-    pop = toolbox.population(n=50)
+toolbox.register("selectBest", tools.selBest, k=K)
+toolbox.register("selectWorst", tools.selWorst, k=K)
+toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.1)
+
+
+def parameterfree_pso():
+    pop = toolbox.population(n=POP)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", numpy.mean)
     stats.register("std", numpy.std)
@@ -112,7 +149,6 @@ def main():
     logbook = tools.Logbook()
     logbook.header = ["gen", "evals"] + stats.fields
 
-    GEN = 1000
     best = None
     
     mu = numpy.linspace(-10,10,100)
@@ -157,9 +193,47 @@ def main():
        	if cv:
        		print ga_pop[0]
         pop = recalibrate_particles(pop, ga_pop)
+        if VISUALIZE == 1:
+            visualize_pso(pop,'_pf-',str(g))
 
     return pop, logbook, best
 
-if __name__ == "__main__":
-    main()
+def normal_pso():
+    pop = toolbox.population(n=POP)
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", numpy.mean)
+    stats.register("std", numpy.std)
+    stats.register("min", numpy.min)
+    stats.register("max", numpy.max)
 
+    logbook = tools.Logbook()
+    logbook.header = ["gen", "evals"] + stats.fields
+
+    best = None
+
+    for g in range(GEN):
+        for part in pop:
+            part.fitness.values = toolbox.evaluate(part)
+            if not part.best or part.best.fitness < part.fitness:
+                part.best = creator.Particle(part)
+                part.best.fitness.values = part.fitness.values
+            if not best or best.fitness < part.fitness:
+                best = creator.Particle(part)
+                best.fitness.values = part.fitness.values
+        for part in pop:
+            toolbox.update(part, best)
+
+        # Gather all the fitnesses in one list and print the stats
+        logbook.record(gen=g, evals=len(pop), **stats.compile(pop))
+        print(logbook.stream)
+
+        if VISUALIZE == 1:
+            visualize_pso(pop,'_normal-',str(g))
+
+    return pop, logbook, best
+
+a,b,bestpf = parameterfree_pso()
+c,d,bestnorm = normal_pso()
+
+print "PF: Best value found: ", benchmarks.ackley(bestpf)[0]
+print "Normal: Best value found: ", benchmarks.ackley(bestnorm)[0]
