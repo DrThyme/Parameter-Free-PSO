@@ -24,6 +24,8 @@ from deap import benchmarks
 from deap import creator
 from deap import tools
 
+import matplotlib.pyplot as plt
+
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
 creator.create("Particle", list, fitness=creator.FitnessMin, speed=list, 
@@ -35,9 +37,9 @@ def generate(size, pmin, pmax, smin, smax):
     part.speed = [random.uniform(smin, smax) for _ in range(size)]
     part.smin = smin
     part.smax = smax
-    part.inertia = numpy.random.rand()
-    part.cognitive = numpy.random.rand()
-    part.social = numpy.random.rand()
+    part.inertia = numpy.random.uniform(0,1)
+    part.cognitive = numpy.random.uniform(0,1)
+    part.social = numpy.random.uniform(0,1)
     return part
 
 def individual_generate(part):
@@ -85,7 +87,7 @@ def recalibrate_particles(pop,ga_pop):
     
 
 toolbox = base.Toolbox()
-toolbox.register("particle", generate, size=2, pmin=-6, pmax=6, smin=-3, smax=3)
+toolbox.register("particle", generate, size=20, pmin=-32, pmax=32, smin=-10, smax=10)
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
@@ -97,10 +99,10 @@ toolbox.register("mate", tools.cxBlend, alpha=0.1)
 # generation: each individual of the current generation
 # is replaced by the 'fittest' (best) of three individuals
 # drawn randomly from the current generation.
-toolbox.register("select", tools.selTournament, tournsize=3)
+toolbox.register("select", tools.selTournament, tournsize=10)
 
 def main():
-    pop = toolbox.population(n=5)
+    pop = toolbox.population(n=50)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", numpy.mean)
     stats.register("std", numpy.std)
@@ -110,8 +112,27 @@ def main():
     logbook = tools.Logbook()
     logbook.header = ["gen", "evals"] + stats.fields
 
-    GEN = 10
+    GEN = 1000
     best = None
+    
+    mu = numpy.linspace(-10,10,100)
+    gamma = numpy.linspace(-10,10,100)
+	
+	
+    fun_map = numpy.empty((mu.size, gamma.size))
+    for i in range(mu.size):
+        for j in range(gamma.size):
+            fun_map[i,j] = benchmarks.ackley([mu[i], gamma[j]])[0]
+    
+    fig = plt.figure()
+    s = fig.add_subplot(1, 1, 1)#, xlabel='$\\gamma$', ylabel='$\\mu$')
+    im = s.imshow(
+        fun_map,
+        extent=(gamma[0], gamma[-1], mu[0], mu[-1]),
+        origin='lower')
+    fig.show()
+		    
+	
     for g in range(GEN):
         ga_pop = []
         for part in pop:
@@ -128,16 +149,13 @@ def main():
         # Gather all the fitnesses in one list and print the stats
         logbook.record(gen=g, evals=len(pop), **stats.compile(pop))
         print(logbook.stream) 
-	print "--------------------------------------"
-        print ga_pop
-        ga_old = ga_pop
+        ga_old = list(map(toolbox.clone, ga_pop))
         ga_pop = evolution(ga_pop)    
-	print "--------------------------------------"
-        print ga_pop
-	print "--------------------------------------"
         print "CONVERGE?"
-        print ga_old == ga_pop
-	print "--------------------------------------"
+       	cv = all([all([(i == 0.2) for i in x]) for x in [map(operator.sub,ga_old[i], ga_pop[i]) for i in range(len(ga_pop))]])
+       	print cv
+       	if cv:
+       		print ga_pop[0]
         pop = recalibrate_particles(pop, ga_pop)
 
     return pop, logbook, best
