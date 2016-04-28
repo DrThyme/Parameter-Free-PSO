@@ -118,6 +118,24 @@ def visualize_pso(pop,label,it):
     plt.savefig(name)
     plt.clf()   
     
+def heatmap(fun)
+    mu = numpy.linspace(-10,10,100)
+    gamma = numpy.linspace(-10,10,100)
+	
+	
+    fun_map = numpy.empty((mu.size, gamma.size))
+    for i in range(mu.size):
+        for j in range(gamma.size):
+            fun_map[i,j] = fun([mu[i], gamma[j]])[0]
+    
+    fig = plt.figure()
+    s = fig.add_subplot(1, 1, 1)#, xlabel='$\\gamma$', ylabel='$\\mu$')
+    im = s.imshow(
+        fun_map,
+        extent=(gamma[0], gamma[-1], mu[0], mu[-1]),
+        origin='lower')
+    fig.show()
+		    
 
 toolbox = base.Toolbox()
 toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=-3, smax=3)
@@ -151,23 +169,7 @@ def parameterfree_pso():
 
     best = None
     
-    mu = numpy.linspace(-10,10,100)
-    gamma = numpy.linspace(-10,10,100)
-	
-	
-    fun_map = numpy.empty((mu.size, gamma.size))
-    for i in range(mu.size):
-        for j in range(gamma.size):
-            fun_map[i,j] = benchmarks.ackley([mu[i], gamma[j]])[0]
-    
-    fig = plt.figure()
-    s = fig.add_subplot(1, 1, 1)#, xlabel='$\\gamma$', ylabel='$\\mu$')
-    im = s.imshow(
-        fun_map,
-        extent=(gamma[0], gamma[-1], mu[0], mu[-1]),
-        origin='lower')
-    fig.show()
-		    
+
 	
     for g in range(GEN):
         ga_pop = []
