@@ -1,5 +1,9 @@
 from functools import partial
 import numpy as np
+import matplotlib.pyplot as plt
+from gatest import ga, init, getFitness
+
+visualize = 0
 
 def _obj_wrapper(func, args, kwargs, x):
     return func(x, *args, **kwargs)
@@ -87,7 +91,12 @@ def pso(func, lb, ub, ieqcons=[], f_ieqcons=None, args=(), kwargs={},
         The objective values at each position in p
    
     """
-   
+    if visualize:
+        np.random.seed(1300)
+        # used for visualizing
+        plt.figure()   
+        frameit = 0000;
+
     assert len(lb)==len(ub), 'Lower- and upper-bounds must be the same length'
     assert hasattr(func, '__call__'), 'Invalid function handle'
     lb = np.array(lb)
@@ -238,7 +247,26 @@ def pso(func, lb, ub, ieqcons=[], f_ieqcons=None, args=(), kwargs={},
 
         if debug:
             print('Best after iteration {:}: {:} {:}'.format(it, g, fg))
+
+        if visualize:
+            temp = str(it)
+	    name = 'pf_frame' + str(0)*(4-len(temp))+ str(temp) + '.png'
+            x_plt = x[:,0]
+            y_plt = x[:,1]
+            plt.plot(x_plt,y_plt, '.')
+            plt.axis([-32,32,-32,32])
+            plt.savefig(name)
+            plt.clf()
+        if it % 5 == 0:
+            print "GO GO GA!"
+            omega_uni, phip_uni, phig_uni = ga(fp,phip_p,phig_p,omega_p)
+            for i in range(S):
+                omega_p[i] = omega_uni[i]
+                phip_p[i] = phip_uni[i]
+                phig_p[i] = phig_uni[i]
+
         it += 1
+
 
     print('Stopping search: maximum iterations reached --> {:}'.format(maxiter))
     
