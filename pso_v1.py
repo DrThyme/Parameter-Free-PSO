@@ -31,16 +31,17 @@ from deap import tools
 #Global variables go here#
 ##########################
 
-POP = 100
+POP = 50
 GEN = 100
-PMIN = -32 
-PMAX = 32
-K = 5
-DIM = 50
+PMIN = -5
+PMAX = 5
+K = 2
+DIM = 20
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
-VISUALIZE = 1
+VISUALIZE = 0
+VISUALIZE_PARAM = 0
 
 ##########################
 
@@ -49,8 +50,7 @@ creator.create("Individual", list, fitness=creator.FitnessMin)
 creator.create("Particle", list, fitness=creator.FitnessMin, speed=list, 
     smin=None, smax=None, best=None, inertia=None, cognitive=None, social=None)
     
-def withley(chromosome):
-    x = chromosome[:]
+def withley(x):
     fitness = 0
     limit = len(x)
     for i in range(limit):
@@ -58,7 +58,7 @@ def withley(chromosome):
             temp = 100*((x[i]**2)-x[j]) + \
                 (1-x[j])**2
             fitness += (float(temp**2)/4000.0) - math.cos(temp) + 1
-    return fitness
+    return fitness,
 
 
 def generate(size, pmin, pmax, smin, smax):
@@ -66,9 +66,9 @@ def generate(size, pmin, pmax, smin, smax):
     part.speed = [random.uniform(smin, smax) for _ in range(size)]
     part.smin = smin
     part.smax = smax
-    part.inertia = numpy.random.uniform(0,2)
-    part.cognitive = numpy.random.uniform(0,2)
-    part.social = numpy.random.uniform(0,2)
+    part.inertia = numpy.random.uniform(0,1)
+    part.cognitive = numpy.random.uniform(0,1)
+    part.social = numpy.random.uniform(0,1)
     return part
 
 def individual_generate(part):
@@ -134,7 +134,22 @@ def visualize_pso(pop,label,it,heatmap):
 
 #    plt.show()
 
+def visualize_params(pop, it):
+    inert = [part.inertia for part in pop]
+    cog = [part.cognitive for part in pop]
+    soc = [part.social for part in pop]
+    plt.hist(inert, bins = numpy.linspace(0,1,20), alpha = .33, label='Inertia')
+    plt.hist(cog, bins = numpy.linspace(0,1,20), alpha = .33, label='Cognitive')
+    plt.hist(soc, bins = numpy.linspace(0,1,20), alpha = .33, label='Social')
+    plt.xlim([0,1])
+    plt.ylim([0,POP])
+    name = 'param' + str(0)*(3-len(str(it)))+ str(it) + '.png'
+    plt.legend()
+    plt.savefig(name)
+    plt.clf()
     
+        
+        
 def createheatmap(fun):
     mu = numpy.linspace(PMIN,PMAX,100)
     gamma = numpy.linspace(PMIN,PMAX,100)
@@ -149,14 +164,14 @@ def createheatmap(fun):
 		    
 
 toolbox = base.Toolbox()
-toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=-3, smax=3)
+toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMIN-PMAX)/10., smax=(PMAX-PMIN)/10.)
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
-toolbox.register("evaluate", benchmarks.ackley)
+toolbox.register("evaluate", withley)
 
 # register the crossover operator
-toolbox.register("mate", tools.cxUniform, indpb=0.5)
+toolbox.register("mate", tools.cxBlend, alpha=0.1)
 # operator for selecting individuals for breeding the next
 # generation: each individual of the current generation
 # is replaced by the 'fittest' (best) of three individuals
@@ -164,7 +179,7 @@ toolbox.register("mate", tools.cxUniform, indpb=0.5)
 
 toolbox.register("selectBest", tools.selBest, k=K)
 toolbox.register("selectWorst", tools.selWorst, k=K)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.1)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.2)
 
 
 def parameterfree_pso():
@@ -185,6 +200,9 @@ def parameterfree_pso():
 
 	
     for g in range(GEN):
+        if VISUALIZE_PARAM == 1:
+            visualize_params(pop,g)
+        
         ga_pop = []
         for part in pop:
             part.fitness.values = toolbox.evaluate(part)
