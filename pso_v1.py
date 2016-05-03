@@ -19,6 +19,10 @@ import random
 import numpy
 import math
 
+import os
+import glob
+import subprocess
+
 import matplotlib.pyplot as plt
 
 from deap import base
@@ -40,8 +44,9 @@ DIM = 20
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
-VISUALIZE = 0
+VISUALIZE = 1
 VISUALIZE_PARAM = 0
+ANIMATE = 1
 
 ##########################
 
@@ -229,6 +234,12 @@ def parameterfree_pso():
         if VISUALIZE == 1:
             visualize_pso(pop,'_pf-',str(g),heatmap)
 
+    if VISUALIZE == 1 and ANIMATE == 1:         
+        subprocess.call("convert -delay 10 -loop 0 frame_pf*.png pf.gif", shell=True)
+
+        for filename in glob.glob("frame_pf*.png"):
+            os.remove(filename)
+
     return pop, logbook, best
 
 def normal_pso():
@@ -265,6 +276,12 @@ def normal_pso():
 
         if VISUALIZE == 1:
             visualize_pso(pop,'_normal-',str(g),heatmap)
+
+    if VISUALIZE == 1 and ANIMATE == 1:        
+        subprocess.call("convert -delay 10 -loop 0 frame_normal*.png normal.gif", shell=True)
+
+        for filename in glob.glob("frame_normal*.png"):
+            os.remove(filename)
 
     return pop, logbook, best
 
