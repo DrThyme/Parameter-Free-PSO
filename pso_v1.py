@@ -19,6 +19,10 @@ import random
 import numpy
 import math
 
+import os
+import glob
+import subprocess
+
 import matplotlib.pyplot as plt
 
 from deap import base
@@ -49,6 +53,7 @@ ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga
 VISUALIZE = 1
 VISUALIZE_PARAM = 1
 heatmap_threshold = 0  # if non zero, heatmap values greater than the threshold will not be diplayed
+ANIMATE = 1
 
 ##########################
 
@@ -305,6 +310,27 @@ def normal_pso():
 
 a,b,bestpf = parameterfree_pso()
 c,d,bestnorm = normal_pso()
+
+if VISUALIZE == 1 and ANIMATE == 1:
+
+    str = "Generating animation."
+    print str
+
+    for filename in glob.glob("frame_normal*.png"):
+
+        str += "."
+        print str
+
+        number = filename[12:16]
+        subprocess.call("convert frame_normal"+number+".png frame_pf"+number+".png +append frame_out"+number+".png", shell=True)
+
+    subprocess.call("convert -delay 10 -loop 0 frame_out*.png final.gif", shell=True)
+
+    for filename in glob.glob("frame_*.png"):
+        os.remove(filename)
+
+    print "Animation done, see final.gif"
+
 
 print "PF: Best value found: ", toolbox.evaluate(bestpf)
 print "Normal: Best value found: ", toolbox.evaluate(bestnorm)
