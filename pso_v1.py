@@ -234,12 +234,6 @@ def parameterfree_pso():
         if VISUALIZE == 1:
             visualize_pso(pop,'_pf-',str(g),heatmap)
 
-    if VISUALIZE == 1 and ANIMATE == 1:         
-        subprocess.call("convert -delay 10 -loop 0 frame_pf*.png pf.gif", shell=True)
-
-        for filename in glob.glob("frame_pf*.png"):
-            os.remove(filename)
-
     return pop, logbook, best
 
 def normal_pso():
@@ -277,16 +271,31 @@ def normal_pso():
         if VISUALIZE == 1:
             visualize_pso(pop,'_normal-',str(g),heatmap)
 
-    if VISUALIZE == 1 and ANIMATE == 1:        
-        subprocess.call("convert -delay 10 -loop 0 frame_normal*.png normal.gif", shell=True)
-
-        for filename in glob.glob("frame_normal*.png"):
-            os.remove(filename)
-
     return pop, logbook, best
 
 a,b,bestpf = parameterfree_pso()
 c,d,bestnorm = normal_pso()
+
+if VISUALIZE == 1 and ANIMATE == 1:
+
+    str = "Generating animation."
+    print str
+
+    for filename in glob.glob("frame_normal*.png"):
+
+        str += "."
+        print str
+
+        number = filename[12:16]
+        subprocess.call("convert frame_normal"+number+".png frame_pf"+number+".png +append frame_out"+number+".png", shell=True)
+
+    subprocess.call("convert -delay 10 -loop 0 frame_out*.png final.gif", shell=True)
+
+    for filename in glob.glob("frame_*.png"):
+        os.remove(filename)
+
+    print "Animation done, see final.gif"
+
 
 print "PF: Best value found: ", toolbox.evaluate(bestpf)
 print "Normal: Best value found: ", toolbox.evaluate(bestnorm)
