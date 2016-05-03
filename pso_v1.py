@@ -50,10 +50,11 @@ GROWING_PARAM = 0       # Parameters grow during the course of the algo
 growth_rate = 1.002     # at each iteration, parameters will bu multiplied by this rate
 ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga
 
-VISUALIZE = 1
-VISUALIZE_PARAM = 1
+VISUALIZE = 0
+VISUALIZE_PARAM = 0
+VISUALIZE_GRAPHS = 1
 heatmap_threshold = 0  # if non zero, heatmap values greater than the threshold will not be diplayed
-ANIMATE = 1
+ANIMATE = 0
 
 ##########################
 
@@ -141,6 +142,14 @@ def evolution(ga_pop):
 
     return pop
 
+def diversity(pop):
+    n = len(pop)
+    d = 0
+    for i in range(n):
+        for j in range(i):
+            for x, y in zip(pop[i], pop[j]):
+                d += (x - y)**2
+    return 2*d/(n*(n-1))
 
 def recalibrate_particles(pop,ga_pop):
     selected = toolbox.selectWorst(pop)
@@ -180,11 +189,67 @@ def visualize_params(pop, it):
     plt.savefig(name)
     plt.clf()
     
-        
+def plotgraph(logbook, pf_flag):
+    gen = logbook.select("gen")
+    fit_mins = logbook.chapters["Fitness"].select("min")
+    div = logbook.chapters["Population"].select("div")
+
+    gen, fit_mins,div = gen[50:], fit_mins[50:], [math.log(x,10) for x in div[50:]]
+
+    fig, ax1 = plt.subplots()
+    line1 = ax1.plot(gen, fit_mins, "b-", label="Minimum Fitness")
+    ax1.set_xlabel("Generation")
+    ax1.set_ylabel("Fitness", color="b")
+    for tl in ax1.get_yticklabels():
+        tl.set_color("b")
+
+    ax2 = ax1.twinx()
+    line2 = ax2.plot(gen, div, "r-", label="Population Diversity")
+    ax2.set_ylabel("Diversity", color="r")
+    for tl in ax2.get_yticklabels():
+        tl.set_color("r")
+
+    lns = line1 + line2
+    labs = [l.get_label() for l in lns]
+    ax1.legend(lns, labs)
+
+    if pf_flag == 1:
+        plt.savefig("pf_graph.png")
+    else:
+        plt.savefig("norm_graph.png")
+    plt.clf()
+
+    if pf_flag == 1:
+        gen = logbook.select("gen")
+        ine = logbook.chapters["Inertia"].select("avg")
+        soc = logbook.chapters["Social"].select("avg")
+        cog = logbook.chapters["Cognitive"].select("avg")
+
+        fig, ax1 = plt.subplots()
+        line1 = ax1.plot(gen, ine, "b-", label="Inertia")
+        for tl in ax1.get_yticklabels():
+            tl.set_color("b")
+
+        line2 = ax1.plot(gen, soc, "g-", label="Social")
+        for tl in ax1.get_yticklabels():
+            tl.set_color("g")
+
+        line3 = ax1.plot(gen, cog, "r-", label="Cognitive")
+        ax1.set_xlabel("Generation")
+        ax1.set_ylabel("Average value", color="k")
+        for tl in ax1.get_yticklabels():
+            tl.set_color("r")
+
+
+        lns = line1 + line2 + line3
+        labs = [l.get_label() for l in lns]
+        ax1.legend(lns, labs, loc="upper left")
+
+        plt.savefig("params_graph.png")
         
 def createheatmap(fun):
-    mu = numpy.linspace(PMIN,PMAX,100)
-    gamma = numpy.linspace(PMIN,PMAX,100)
+    mu = numpy.linspace(PMIN,PMAX,1000)
+    gamma = numpy.linspace(PMIN,PMAX,1000)
 	
 	
     fun_map = numpy.empty((mu.size, gamma.size))
@@ -204,7 +269,7 @@ toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMI
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
-toolbox.register("evaluate", benchmarks.ackley)
+toolbox.register("evaluate", benchmarks.schaffer)
 
 # register the crossover operator
 toolbox.register("mate", tools.cxBlend, alpha=0.2)
@@ -220,14 +285,23 @@ toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.5)
 
 def parameterfree_pso():
     pop = toolbox.population(n=POP)
-    stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("avg", numpy.mean)
-    stats.register("std", numpy.std)
-    stats.register("min", numpy.min)
-    stats.register("max", numpy.max)
+    stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+    stats_pop = tools.Statistics()
+    stats_ine = tools.Statistics(lambda ind: ind.inertia)
+    stats_soc = tools.Statistics(lambda ind: ind.social)
+    stats_cog = tools.Statistics(lambda ind: ind.cognitive)
+    stats = tools.MultiStatistics(Fitness = stats_fit, Population = stats_pop, Inertia = stats_ine, Social = stats_soc, Cognitive = stats_cog)
+    stats_fit.register("avg", numpy.mean)
+    stats_fit.register("std", numpy.std)
+    stats_fit.register("min", numpy.min)
+    stats_fit.register("max", numpy.max)
+    stats_ine.register("avg", numpy.mean)
+    stats_soc.register("avg", numpy.mean)
+    stats_cog.register("avg", numpy.mean)
+    stats_pop.register("div", diversity)
 
     logbook = tools.Logbook()
-    logbook.header = ["gen", "evals"] + stats.fields
+    logbook.header = ["gen", "evals", "Fitness", "Inertia", "Social", "Cognitive", "Population"]
 
     best = None
     
@@ -268,15 +342,21 @@ def parameterfree_pso():
         if VISUALIZE == 1:
             visualize_pso(pop,'_pf-',str(g),heatmap)
 
+    if VISUALIZE_GRAPHS == 1:
+        plotgraph(logbook,1)
+
     return pop, logbook, best
 
 def normal_pso():
     pop = toolbox.population(n=POP)
-    stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("avg", numpy.mean)
-    stats.register("std", numpy.std)
-    stats.register("min", numpy.min)
-    stats.register("max", numpy.max)
+    stats_fit = tools.Statistics(lambda ind: ind.fitness.values)
+    stats_pop = tools.Statistics()
+    stats = tools.MultiStatistics(Fitness = stats_fit, Population = stats_pop)
+    stats_fit.register("avg", numpy.mean)
+    stats_fit.register("std", numpy.std)
+    stats_fit.register("min", numpy.min)
+    stats_fit.register("max", numpy.max)
+    stats_pop.register("div", diversity)
 
     logbook = tools.Logbook()
     logbook.header = ["gen", "evals"] + stats.fields
@@ -306,6 +386,9 @@ def normal_pso():
         if VISUALIZE == 1:
             visualize_pso(pop,'_normal-',str(g),heatmap)
 
+    if VISUALIZE_GRAPHS == 1:
+        plotgraph(logbook,0)
+
     return pop, logbook, best
 
 a,b,bestpf = parameterfree_pso()
@@ -334,3 +417,5 @@ if VISUALIZE == 1 and ANIMATE == 1:
 
 print "PF: Best value found: ", toolbox.evaluate(bestpf)
 print "Normal: Best value found: ", toolbox.evaluate(bestnorm)
+
+
