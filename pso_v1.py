@@ -36,24 +36,26 @@ from deap import tools
 ##########################
 
 POP = 50
-GEN = 100
-PMIN = -32
-PMAX = 32
-K = 3
+GEN = 500
+PMIN = -5
+PMAX = 5
+K = 5
 DIM = 50
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
 ilb = 0.75              # inertia_lower_bound, should be in [0,1]
 
-GROWING_PARAM = 0       # Parameters grow during the course of the algo
-growth_rate = 1.002     # at each iteration, parameters will bu multiplied by this rate
+GROWING_PARAM = 1       # Parameters grow during the course of the algo
+growth_rate = 1.001     # at each iteration, parameters will bu multiplied by this rate
 ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga
+fit_weight = 0.5
+bestfit_weight = 1.0
 
 VISUALIZE = 0
 VISUALIZE_PARAM = 0
 VISUALIZE_GRAPHS = 1
-heatmap_threshold = 0  # if non zero, heatmap values greater than the threshold will not be diplayed
+heatmap_threshold = 0   # if non zero, heatmap values greater than the threshold will not be displayed
 ANIMATE = 0
 
 ##########################
@@ -91,15 +93,23 @@ def generate(size, pmin, pmax, smin, smax):
     part.social = numpy.random.uniform(0,1)
     return part
 
+
+
 def individual_generate(part):
     indi = creator.Individual([part.inertia,part.cognitive,part.social])
     if ALTERNATE_GA_FIT == 1:
         fit, lastfit = part.fitness.values[0],part.lastFit[0]
         improvement = max(0,fit-lastfit)
         indi.fitness = (fit/(improvement+1),)
-    else:
+    elif ALTERNATE_GA_FIT == 2:
+        fit, bestfit = part.fitness.values[0],part.best.fitness.values[0]
+        newfit = fit_weight*fit + bestfit_weight*bestfit
+        indi.fitness = (newfit,)
+    else :
         indi.fitness = part.fitness
     return indi
+
+
 
 def updateParticle(part, best, phi1, phi2):
     u1 = (random.uniform(0, phi1) for _ in range(len(part)))
@@ -110,10 +120,6 @@ def updateParticle(part, best, phi1, phi2):
     v_u2 = [x * part.social for x in v_u2]
     part.speed = [x * part.inertia for x in part.speed]
     part.speed = list(map(operator.add, part.speed, map(operator.add, v_u1, v_u2)))
-    if GROWING_PARAM == 1:
-        part.inertia   = min(part.inertia*growth_rate,2)
-        part.cognitive = min(part.cognitive*growth_rate,2)
-        part.social    = min(part.social*growth_rate,2)
     for i, speed in enumerate(part.speed):
         if speed < part.smin:
             part.speed[i] = part.smin
@@ -248,8 +254,8 @@ def plotgraph(logbook, pf_flag):
         plt.savefig("params_graph.png")
         
 def createheatmap(fun):
-    mu = numpy.linspace(PMIN,PMAX,1000)
-    gamma = numpy.linspace(PMIN,PMAX,1000)
+    mu = numpy.linspace(PMIN,PMAX,100)
+    gamma = numpy.linspace(PMIN,PMAX,100)
 	
 	
     fun_map = numpy.empty((mu.size, gamma.size))
@@ -269,10 +275,10 @@ toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMI
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
-toolbox.register("evaluate", benchmarks.schaffer)
+toolbox.register("evaluate", whitley)
 
 # register the crossover operator
-toolbox.register("mate", tools.cxBlend, alpha=0.2)
+toolbox.register("mate", tools.cxBlend, alpha=0.0)
 # operator for selecting individuals for breeding the next
 # generation: each individual of the current generation
 # is replaced by the 'fittest' (best) of three individuals
@@ -280,7 +286,7 @@ toolbox.register("mate", tools.cxBlend, alpha=0.2)
 
 toolbox.register("selectBest", tools.selBest, k=K)
 toolbox.register("selectWorst", tools.selWorst, k=K)
-toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.5)
+toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.1)
 
 
 def parameterfree_pso():
@@ -296,8 +302,11 @@ def parameterfree_pso():
     stats_fit.register("min", numpy.min)
     stats_fit.register("max", numpy.max)
     stats_ine.register("avg", numpy.mean)
+    stats_ine.register("std", numpy.std)
     stats_soc.register("avg", numpy.mean)
+    stats_soc.register("std", numpy.std)
     stats_cog.register("avg", numpy.mean)
+    stats_cog.register("std", numpy.std)
     stats_pop.register("div", diversity)
 
     logbook = tools.Logbook()
@@ -326,6 +335,10 @@ def parameterfree_pso():
                 best = creator.Particle(part)
                 best.fitness.values = part.fitness.values
         for part in pop:
+            if GROWING_PARAM == 1:
+                part.inertia   = min(part.inertia*growth_rate,2)
+                part.cognitive = min(part.cognitive*growth_rate,2)
+                part.social    = min(part.social*growth_rate,2)
             toolbox.update(part, best)
             ga_pop.append(toolbox.individual(part))
         # Gather all the fitnesses in one list and print the stats
@@ -362,7 +375,10 @@ def normal_pso():
     logbook.header = ["gen", "evals"] + stats.fields
 
     best = None
-    
+
+#    for part in pop:
+#        part.inertia, part.social, part.cognitive = 1,1,1
+
     if VISUALIZE == 1:
         heatmap = createheatmap(toolbox.evaluate)
 
@@ -376,7 +392,6 @@ def normal_pso():
                 best = creator.Particle(part)
                 best.fitness.values = part.fitness.values
         for part in pop:
-            part.inertia, part.social, part.cognitive =1,1,1
             toolbox.update(part, best)
 
         # Gather all the fitnesses in one list and print the stats
