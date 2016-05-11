@@ -36,29 +36,36 @@ from deap import tools
 ##########################
 
 POP = 50
-GEN = 500
-PMIN = -5
-PMAX = 5
-K = 5
+GEN = 50
+PMIN = -32
+PMAX = 32
+K = 5                   # 5, 10, 25, 50
 DIM = 50
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
-ilb = 0.75              # inertia_lower_bound, should be in [0,1]
+ilb = 0.75              # inertia_lower_bound, should be in [0,1], step length .1
 
 GROWING_PARAM = 1       # Parameters grow during the course of the algo
 growth_rate = 1.001     # at each iteration, parameters will bu multiplied by this rate
-ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga
-fit_weight = 0.5
+ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga, 0,1,2
+fit_weight = 0.5        # [0, 2], step .5
 bestfit_weight = 1.0
 
 VISUALIZE = 0
 VISUALIZE_PARAM = 0
-VISUALIZE_GRAPHS = 1
+VISUALIZE_GRAPHS = 0
 heatmap_threshold = 0   # if non zero, heatmap values greater than the threshold will not be displayed
 ANIMATE = 0
 
 ##########################
+
+def set_parameters(k, ilb, growing_param, alternate_ga_fit, fit_weight):
+    K = k
+    ilb = ilb
+    GROWING_PARAM = growing_param
+    ALTERNATE_GA_FIT = alternate_ga_fit
+    fit_weight = fit_weight
 
 creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
@@ -275,7 +282,7 @@ toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMI
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
-toolbox.register("evaluate", whitley)
+toolbox.register("evaluate", benchmarks.ackley)
 
 # register the crossover operator
 toolbox.register("mate", tools.cxBlend, alpha=0.0)
@@ -406,8 +413,49 @@ def normal_pso():
 
     return pop, logbook, best
 
-a,b,bestpf = parameterfree_pso()
-c,d,bestnorm = normal_pso()
+i = 0
+test_val_k = [5, 10, 25, 50]
+test_val_ilb = [.1, .2, .3, .4, .5, .6, .7, .8, .9, 1]
+test_val_growing_param = [0, 1]
+test_val_alternate_ga_fit = [0, 1, 2]
+test_val_fit_weight = [0, .5, 1, 1.5, 2]
+
+total_len = len(test_val_k)+len(test_val_ilb)+len(test_val_growing_param)+len(test_val_alternate_ga_fit)+len(test_val_fit_weight)
+
+while True:
+    
+#    f.write("-------------------\n")
+#    f.write("\nITERATION "+str(i)+":\n")
+#    f.write("-------------------\n")
+   
+    for test_k in test_val_k:
+        for test_ilb in test_val_ilb:
+            for test_growing_param in test_val_growing_param:
+                for test_alternate_ga_fit in test_val_alternate_ga_fit:
+                    for test_fit_weight in test_val_fit_weight:
+
+                        set_parameters(test_k, test_ilb, test_growing_param, test_alternate_ga_fit, test_fit_weight)
+
+                        f = open("output/output-"+str(test_k)+"-"+str(test_ilb)+"-"+str(test_growing_param)+"-"+str(test_alternate_ga_fit)+"-"+str(test_fit_weight)+".txt", "a")
+
+                        a,b,bestpf = parameterfree_pso()
+                        #c,d,bestnorm = normal_pso()
+
+                        best_pf = toolbox.evaluate(bestpf)
+                        #best_norm = toolbox.evaluate(bestnorm)
+
+
+                        f.write(str(test_k)+"\n")
+                        f.write(str(test_ilb)+"\n")
+                        f.write(str(test_growing_param)+"\n")
+                        f.write(str(test_alternate_ga_fit)+"\n")
+                        f.write(str(test_fit_weight)+"\n")
+                        f.write(str(best_pf)+"\n")
+                        f.write("\n")
+
+    f.close()
+
+    i+=1
 
 if VISUALIZE == 1 and ANIMATE == 1:
 
