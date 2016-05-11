@@ -35,18 +35,18 @@ from deap import tools
 #Global variables go here#
 ##########################
 
-POP = 50
+POP = 20
 GEN = 500
 PMIN = -5
 PMAX = 5
 K = 5
-DIM = 50
+DIM = 20
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
 ilb = 0.75              # inertia_lower_bound, should be in [0,1]
 
-GROWING_PARAM = 1       # Parameters grow during the course of the algo
+GROWING_PARAM = 0       # Parameters grow during the course of the algo
 growth_rate = 1.001     # at each iteration, parameters will bu multiplied by this rate
 ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga
 fit_weight = 0.5
@@ -64,7 +64,7 @@ creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)
 creator.create("Particle", list, fitness=creator.FitnessMin, speed=list, 
     smin=None, smax=None, best=None, inertia=None, cognitive=None, social=None,
-    lastFit=None)
+    lastFit=None, prevFit = None)
     
 def whitley(x):
     """
@@ -156,12 +156,115 @@ def diversity(pop):
             for x, y in zip(pop[i], pop[j]):
                 d += (x - y)**2
     return 2*d/(n*(n-1))
+    
+    
+def popstats(pop):
+    n = len(pop)
+    dist = [[0 for x in range(n-1)] for y in range(n)]
+    for i in range(n):
+        for j in range(i):
+            d = 0
+            for x, y in zip(pop[i], pop[j]):
+                d += (x - y)**2
+            d = math.sqrt(d)
+            dist[i][j] = d
+            dist[j][i-1] = d
+    meandist = [numpy.mean(x) for x in dist]
+    maxdist = [numpy.max(x) for x in dist]
+    mindist = [numpy.min(x) for x in dist]
+    minmin = numpy.min(mindist)
+    meanmin = numpy.mean(mindist)
+    maxmin = numpy.max(mindist)
+    minmean = numpy.min(meandist)
+    meanmean = numpy.mean(meandist)
+    maxmean = numpy.max(meandist)
+    minmax = numpy.min(maxdist)
+    meanmax = numpy.mean(maxdist)
+    maxmax = numpy.max(maxdist)
+    c1 = len([0 for x in maxdist if x < minmin])
+    c2 = len([0 for x in maxdist if x < meanmin])
+    c3 = len([0 for x in maxdist if x < maxmin])
+    c4 = len([0 for x in maxdist if x < minmean])
+    c5 = len([0 for x in maxdist if x < meanmean])
+    c6 = len([0 for x in maxdist if x < maxmean])
+    c7 = len([0 for x in maxdist if x < minmax])
+    c8 = len([0 for x in maxdist if x < meanmax])
+    c9 = len([0 for x in maxdist if x < maxmax])
+    starvecrit =  numpy.mean([len([0 for x in y if x < minmean]) for y in dist]) #average nbof neighbour closerthan minimum average distance
+    starvevec = [len([0 for x in y if x < minmean]) for y in dist]
+    starving = len([0 for x in starvevec if x > 0.4*POP])
+    isolcrit =  numpy.mean([len([0 for x in y if x < maxmean]) for y in dist])
+    isolvec = [len([0 for x in y if x < maxmean]) for y in dist]
+    isolated = len([0 for x in isolvec if x < 0.6*POP])
+    healthcrit =  numpy.mean([len([0 for x in y if x < meanmean]) for y in dist])
+    healthvec = [len([0 for x in y if x < meanmean]) for y in dist]
+#    print healthvec
+    healthy = len([0 for x in healthvec if x > 0.4*POP if x < 0.6*POP])
+#    print [c1,c2,c3,c4,c5,c6,c7,c8,c9]
+    return [starving, healthy, isolated, starving+healthy+isolated]
+    
+    
+    
+def update_flags(pop):
+    n = len(pop)
+    dist = [[0 for x in range(n-1)] for y in range(n)]
+    for i in range(n):
+        for j in range(i):
+            d = 0
+            for x, y in zip(pop[i], pop[j]):
+                d += (x - y)**2
+            d = math.sqrt(d)
+            dist[i][j] = d
+            dist[j][i-1] = d
+    meandist = [numpy.mean(x) for x in dist]
+    maxdist = [numpy.max(x) for x in dist]
+    mindist = [numpy.min(x) for x in dist]
+    meanmin = numpy.mean(mindist)
+    maxmin = numpy.max(mindist)
+    minmean = numpy.min(meandist)
+    meanmean = numpy.mean(meandist)
+    maxmean = numpy.max(meandist)
+    meanmax = numpy.mean(maxdist)
+    minmax = numpy.min(maxdist)
+    
+    lbpop = 0.4*n
+    ubpop = 0.6*n
+    
+    starvecrit =  numpy.mean([len([0 for x in y if x < minmean]) for y in dist])
+    starvevec = [len([0 for x in y if x < minmean]) for y in dist]
+    starveprob = [(x-lbpop)/ubpop for x in starvevec]
+    
+    isolcrit =  numpy.mean([len([0 for x in y if x < maxmean]) for y in dist])
+    isolvec = [len([0 for x in y if x < maxmean]) for y in dist]
+    isolprob = [(x)/lbpop for x in starvevec]
+    
+    healthcrit =  numpy.mean([len([0 for x in y if x < meanmean]) for y in dist])
+    healthvec = [len([0 for x in y if x < meanmean]) for y in dist]
+    breeders = [1 if (x > lbpop and x < ubpop) else 0 for x in healthvec]
+    
+    markedforremoval = [0 if ((1-numpy.random.exponential(.01)) < starveprob[i] or (numpy.random.exponential(.01)) > isolprob[i]) else 1 for i in range(n)]
+    removeflag = numpy.nonzero(markedforremoval)[0]
+    breedflag = numpy.nonzero(breeders)[0]
+    print sum(markedforremoval)
+    return removeflag, breeders, sum(breeders)
+    
+    
+    
+    
 
-def recalibrate_particles(pop,ga_pop):
-    selected = toolbox.selectWorst(pop)
-    for i in range(0,len(selected)):
-        selected[i].inertia, selected[i].cognitive, selected[i].social = (ga_pop[i])[0],(ga_pop[i])[1], (ga_pop[i])[2]
-    return pop
+def breed_particles(pop,ga_pop):
+    children = []
+    for i in range(0,len(pop)):
+        child = creator.Particle(pop[i].best)
+        child.speed = [random.uniform(pop[i].smin, pop[i].smax) for _ in range(DIM)]
+        child.smin = pop[i].smin
+        child.smax = pop[i].smax
+        child.inertia = (ga_pop[i])[0]
+        child.cognitive = (ga_pop[i])[1]
+        child.social = (ga_pop[i])[2]
+        child.fitness.values = pop[i].fitness.values
+        children.append(child)
+    return children
         
 def visualize_pso(pop,label,it,heatmap):
     plt.imshow(heatmap,extent=(PMIN,PMAX,PMIN,PMAX), origin ='lower')
@@ -275,7 +378,7 @@ toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMI
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
-toolbox.register("evaluate", whitley)
+toolbox.register("evaluate", benchmarks.schaffer)
 
 # register the crossover operator
 toolbox.register("mate", tools.cxBlend, alpha=0.0)
@@ -313,7 +416,7 @@ def parameterfree_pso():
     logbook.header = ["gen", "evals", "Fitness", "Inertia", "Social", "Cognitive", "Population"]
 
     best = None
-    
+    st = []
     if VISUALIZE == 1:
         heatmap = createheatmap(toolbox.evaluate)
     for part in pop:
@@ -326,6 +429,7 @@ def parameterfree_pso():
         
         ga_pop = []
         for part in pop:
+            part.prevFit = part.fitness.values
             part.lastFit = part.fitness.values
             part.fitness.values = toolbox.evaluate(part)
             if not part.best or part.best.fitness < part.fitness:
@@ -341,22 +445,53 @@ def parameterfree_pso():
                 part.social    = min(part.social*growth_rate,2)
             toolbox.update(part, best)
             ga_pop.append(toolbox.individual(part))
+            
+         
         # Gather all the fitnesses in one list and print the stats
         logbook.record(gen=g, evals=len(pop), **stats.compile(pop))
         print(logbook.stream) 
 #        ga_old = list(map(toolbox.clone, ga_pop))
-        ga_pop = evolution(ga_pop)    
+        removeflag, breeders, newpart = update_flags(pop)
+        helpflag = [1 if (part.fitness.values > part.lastFit or part.lastFit > part.prevFit) else 0 for part in pop]
+        breedflag = [helpflag[i]*breeders[i] for i in range(len(breeders))]
+        breedflag = numpy.nonzero(breedflag)[0]
+        newpart = len(breedflag)
+        print newpart
+        toolbox.register("selectBest", tools.selBest, k=newpart)
+        ga_pop = evolution(ga_pop)
 #        print "CONVERGE?"
 #       	cv = all([all([(i < 0.2) for i in x]) for x in [map(operator.sub,ga_old[i], ga_pop[i]) for i in range(len(ga_pop))]])
 #       	print cv
 #       	if cv:
 #       		print ga_pop[0]
-        pop = recalibrate_particles(pop, ga_pop)
+        children = breed_particles([pop[i] for i in breedflag], ga_pop)
+        pop = [pop[i] for i in removeflag]+children
+        st.append(popstats(pop))
         if VISUALIZE == 1:
             visualize_pso(pop,'_pf-',str(g),heatmap)
+        
 
     if VISUALIZE_GRAPHS == 1:
         plotgraph(logbook,1)
+        
+    minmin = [x[0] for x in st]
+    meanmin = [x[1] for x in st]
+    maxmin = [x[2] for x in st]
+    sumclass = [x[3] for x in st]
+    ax = plt.subplot(111)
+    ax.plot(minmin, label='starving')
+    ax.plot(meanmin, label='healthy')
+    ax.plot(maxmin, label='isolated')
+    ax.plot(sumclass, label='sum')
+        
+    # Shrink current axis by 20%
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.show()
+    plt.clf()
 
     return pop, logbook, best
 
@@ -407,6 +542,8 @@ def normal_pso():
     return pop, logbook, best
 
 a,b,bestpf = parameterfree_pso()
+random.seed(1234)
+numpy.random.seed(1234)
 c,d,bestnorm = normal_pso()
 
 if VISUALIZE == 1 and ANIMATE == 1:
