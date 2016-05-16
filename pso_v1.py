@@ -15,6 +15,7 @@
 
 import operator
 import random
+import sys
 
 import numpy
 import math
@@ -36,19 +37,19 @@ from deap import tools
 ##########################
 
 POP = 50
-GEN = 50
+GEN = 200
 PMIN = -32
 PMAX = 32
-K = 5                   # 5, 10, 25, 50
-DIM = 50
+K = 50                   # 5, 10, 25, 50
+DIM = 200
 plt.figure()
 random.seed(1234)
 numpy.random.seed(1234)
 ilb = 0.75              # inertia_lower_bound, should be in [0,1], step length .1
 
-GROWING_PARAM = 1       # Parameters grow during the course of the algo
+GROWING_PARAM = 0       # Parameters grow during the course of the algo
 growth_rate = 1.001     # at each iteration, parameters will bu multiplied by this rate
-ALTERNATE_GA_FIT = 0    # Use alternative fitness for ga, 0,1,2
+ALTERNATE_GA_FIT = 2    # Use alternative fitness for ga, 0,1,2
 fit_weight = 0.5        # [0, 2], step .5
 bestfit_weight = 1.0
 
@@ -100,6 +101,15 @@ def generate(size, pmin, pmax, smin, smax):
     part.social = numpy.random.uniform(0,1)
     return part
 
+def generateNormal(size, pmin, pmax, smin, smax,i,c,s):
+    part = creator.Particle(random.uniform(pmin, pmax) for _ in range(size)) 
+    part.speed = [random.uniform(smin, smax) for _ in range(size)]
+    part.smin = smin
+    part.smax = smax
+    part.inertia = inertia
+    part.cognitive = coginitive
+    part.social = social
+    return part
 
 
 def individual_generate(part):
@@ -276,11 +286,14 @@ def createheatmap(fun):
     
     return fun_map
 		    
+cmd = sys.argv
 
 toolbox = base.Toolbox()
 toolbox.register("particle", generate, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMIN-PMAX)/10., smax=(PMAX-PMIN)/10.)
+toolbox.register("particleNormal", generateNormal, size=DIM, pmin=PMIN, pmax=PMAX, smin=(PMIN-PMAX)/10., smax=(PMAX-PMIN)/10., i=float(cmd[1]),c=float(cmd[2]),s=float(cmd[3]))
 toolbox.register("individual", individual_generate)
 toolbox.register("population", tools.initRepeat, list, toolbox.particle)
+toolbox.register("populationNormal", tools.initRepeat, list, toolbox.particleNormal)
 toolbox.register("update", updateParticle, phi1=2.0, phi2=2.0)
 toolbox.register("evaluate", benchmarks.ackley)
 
@@ -422,7 +435,7 @@ test_val_fit_weight = [0, .5, 1, 1.5, 2]
 
 total_len = len(test_val_k)+len(test_val_ilb)+len(test_val_growing_param)+len(test_val_alternate_ga_fit)+len(test_val_fit_weight)
 
-while True:
+while False:
     
 #    f.write("-------------------\n")
 #    f.write("\nITERATION "+str(i)+":\n")
@@ -478,6 +491,8 @@ if VISUALIZE == 1 and ANIMATE == 1:
     print "Animation done, see final.gif"
 
 
+a,b,bestpf = parameterfree_pso()
+c,d,bestnorm = normal_pso()
 print "PF: Best value found: ", toolbox.evaluate(bestpf)
 print "Normal: Best value found: ", toolbox.evaluate(bestnorm)
 
